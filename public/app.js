@@ -60,8 +60,6 @@ async function handleLogout() {
 // Check auth on load
 checkAuth();
 
-const socket = io();
-
 const startBtn = document.getElementById('startRecordBtn');
 const stopBtn = document.getElementById('stopRecordBtn');
 const clearBtn = document.getElementById('clearBtn');
@@ -208,16 +206,36 @@ async function startRecording() {
     mediaRecorder.ondataavailable = (event) => {
       if (event.data.size > 0) {
         audioChunks.push(event.data);
-        event.data.arrayBuffer().then(buf => {
-          socket.emit('audio-chunk', buf);
-        });
       }
     };
 
-    mediaRecorder.onstop = () => {
+    mediaRecorder.onstop = async () => {
       stream.getTracks().forEach(t => t.stop());
       showProgress('process');
-      socket.emit('transcribe');
+
+      try {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        const arrayBuffer = await audioBlob.arrayBuffer();
+        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
+        const res = await fetch('/api/transcribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ audio: base64 }),
+        });
+        const data = await res.json();
+
+        if (data.text) {
+          inputText.value = (inputText.value + ' ' + data.text).trim();
+          updateLangBadge(inputText.value);
+          showToast('Transcription received', 'success');
+        } else if (data.error) {
+          showToast(data.error, 'error');
+        }
+      } catch (err) {
+        showToast('Transcription failed', 'error');
+      }
+      hideProgress();
     };
 
     mediaRecorder.start(1000);
@@ -243,23 +261,6 @@ function stopRecording() {
     recordingIndicator.classList.remove('flex');
   }
 }
-
-socket.on('transcription-status', (data) => {
-  if (data.status === 'processing') {
-    showProgress('process');
-  }
-});
-
-socket.on('transcription', (data) => {
-  if (data.text) {
-    inputText.value = (inputText.value + ' ' + data.text).trim();
-    updateLangBadge(inputText.value);
-    showToast('Transcription received', 'success');
-  } else if (data.error) {
-    showToast(data.error, 'error');
-  }
-  hideProgress();
-});
 
 function clearAll() {
   inputText.value = '';
