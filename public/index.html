@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LetterBot - AI Letter Generator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-blue-50 to-white text-gray-900">
+  <header class="bg-white border-b border-gray-200 shadow-sm">
+    <div class="max-w-4xl mx-auto px-4 py-4 flex items-center gap-3">
+      <svg class="w-10 h-10 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="2" y="4" width="20" height="16" rx="2" />
+        <path d="M22 7L12 13L2 7" />
+        <circle cx="12" cy="13" r="1.5" fill="currentColor" stroke="none" />
+      </svg>
+      <div class="flex-1">
+        <h1 class="text-xl font-bold text-gray-900">LetterBot</h1>
+        <p class="text-sm text-gray-500">AI Letter Generator</p>
+      </div>
+      <div id="langBadge" class="flex items-center gap-2 px-3 py-1.5 bg-blue-100 text-blue-700 text-sm rounded-full">
+        <span class="w-2 h-2 bg-blue-500 rounded-full"></span>
+        <span>EN</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="max-w-4xl mx-auto px-4 py-8">
+    <p class="text-center text-gray-500 mb-6">Speak or type your thoughts, and AI will write a letter for you</p>
+
+    <div class="bg-white rounded-xl p-6 mb-6 border border-gray-200 shadow-sm">
+      <div class="flex flex-wrap items-center gap-3 mb-4">
+        <div class="flex items-center gap-2">
+          <button id="startRecordBtn" class="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition disabled:opacity-50">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a3 3 0 00-3 3v5a3 3 0 006 0V5a3 3 0 00-3-3z"/><path d="M5 10a1 1 0 00-2 0 7 7 0 0014 0 1 1 0 00-2 0 5 5 0 01-10 0z"/></svg>
+            Start Recording
+          </button>
+          <button id="stopRecordBtn" class="flex items-center gap-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition disabled:opacity-50" disabled>
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><rect width="8" height="8" x="6" y="6" rx="1"/></svg>
+            Stop
+          </button>
+          <button id="clearBtn" class="flex items-center gap-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            Clear
+          </button>
+        </div>
+        <div id="recordingIndicator" class="hidden items-center gap-2 text-red-500 text-sm ml-2">
+          <span class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+          Recording via server...
+        </div>
+      </div>
+
+      <div class="flex flex-wrap gap-3 mb-4">
+        <select id="templateSelect" class="px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="general">General Letter</option>
+          <option value="leave">Leave Letter</option>
+          <option value="complaint">Complaint Letter</option>
+          <option value="resignation">Resignation Letter</option>
+          <option value="application">Job Application</option>
+          <option value="recommendation">Recommendation Letter</option>
+          <option value="apology">Apology Letter</option>
+          <option value="thank_you">Thank You Letter</option>
+        </select>
+        <select id="typeSelect" class="px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="formal">Formal</option>
+          <option value="informal">Informal</option>
+        </select>
+      </div>
+
+      <textarea id="inputText" rows="4" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-4 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Type your thoughts here, or use the microphone to speak..."></textarea>
+
+      <div class="flex flex-wrap gap-3 mt-4">
+        <button id="generateBtn" class="flex-1 min-w-[140px] px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition disabled:opacity-50">
+          Generate Letter
+        </button>
+      </div>
+    </div>
+
+    <div id="outputSection" class="bg-white rounded-xl p-6 border border-gray-200 shadow-sm hidden">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-semibold" id="outputTitle">Generated Letter</h2>
+        <div class="flex gap-2">
+          <button id="copyBtn" class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-sm transition flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+            Copy
+          </button>
+          <button id="pdfBtn" class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-sm transition flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            PDF
+          </button>
+        </div>
+      </div>
+      <div id="letterContent" class="prose max-w-none whitespace-pre-wrap text-gray-700 leading-relaxed"></div>
+      <div id="cursor" class="inline-block w-2 h-5 bg-blue-500 animate-pulse hidden"></div>
+      <div id="loadingIndicator" class="flex items-center gap-3 text-gray-500 mt-4 hidden">
+        <div class="flex gap-1">
+          <span class="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style="animation-delay:0ms"></span>
+          <span class="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style="animation-delay:150ms"></span>
+          <span class="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style="animation-delay:300ms"></span>
+        </div>
+        <span class="text-sm">Generating your letter...</span>
+      </div>
+      <div class="flex flex-wrap gap-3 mt-4 pt-4 border-t border-gray-200">
+        <input id="emailInput" type="email" placeholder="Enter email to send..." class="flex-1 min-w-[200px] px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <button id="emailBtn" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm transition flex items-center gap-1.5 disabled:opacity-50">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+          Send Email
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="bg-white border-t border-gray-200 mt-12">
+    <div class="max-w-4xl mx-auto px-4 py-6 text-center text-sm text-gray-500">
+      <p>LetterBot &mdash; Made with AI &hearts; &mdash; Supports English, සිංහල, தமிழ்</p>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
