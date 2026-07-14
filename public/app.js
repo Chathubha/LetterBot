@@ -1,3 +1,65 @@
+// ─── SUPABASE INIT ───
+const SUPABASE_URL = 'https://ctzugdahtkfddwcdoyjn.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN0enVnZGFodGtmZGR3Y2RveWpuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5OTI3MDIsImV4cCI6MjA5OTU2ODcwMn0.iwAhxHe67SLu5DD51KLP75qlPUBue7KC-snP30VG8Ys';
+const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUser = null;
+
+// ─── AUTH CHECK ───
+async function checkAuth() {
+  try {
+    const { data: { session }, error } = await sbClient.auth.getSession();
+    
+    if (error) {
+      console.error('Session error:', error);
+      window.location.href = '/login.html';
+      return;
+    }
+    
+    if (!session) {
+      window.location.href = '/login.html';
+      return;
+    }
+    
+    currentUser = session.user;
+    updateUserUI(currentUser);
+  } catch (e) {
+    console.error('Auth check failed:', e);
+    window.location.href = '/login.html';
+  }
+}
+
+function updateUserUI(user) {
+  const userMenu = document.getElementById('userMenu');
+  const loginBtn = document.getElementById('loginBtn');
+  const userInitial = document.getElementById('userInitial');
+  const userName = document.getElementById('userName');
+  
+  if (user) {
+    userMenu.classList.remove('hidden');
+    userMenu.classList.add('flex');
+    loginBtn.classList.add('hidden');
+    
+    const name = user.user_metadata?.full_name || user.email?.split('@')[0] || 'User';
+    const initial = name.charAt(0).toUpperCase();
+    
+    userInitial.textContent = initial;
+    userName.textContent = name;
+  } else {
+    userMenu.classList.add('hidden');
+    userMenu.classList.remove('flex');
+    loginBtn.classList.remove('hidden');
+  }
+}
+
+async function handleLogout() {
+  await sbClient.auth.signOut();
+  window.location.href = '/login.html';
+}
+
+// Check auth on load
+checkAuth();
+
 const socket = io();
 
 const startBtn = document.getElementById('startRecordBtn');
