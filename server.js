@@ -7,6 +7,7 @@ const { Server } = require('socket.io');
 const OpenAI = require('openai');
 const generateRoute = require('./routes/generate');
 const emailRoute = require('./routes/email');
+const polishRoute = require('./routes/polish');
 
 const app = express();
 const server = http.createServer(app);
@@ -15,9 +16,10 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
   baseURL: process.env.ZEN_BASE_URL || 'https://opencode.ai/zen/v1',
 });
-const BIG_PICKLE_MODEL = process.env.BIG_PICKLE_MODEL || 'big-pickle';
 
 const PORT = process.env.PORT || 3000;
+
+let usageCount = 0;
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -25,6 +27,16 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/api', generateRoute);
 app.use('/api', emailRoute);
+app.use('/api', polishRoute);
+
+app.get('/api/usage', (req, res) => {
+  res.json({ count: usageCount });
+});
+
+app.post('/api/usage/increment', (req, res) => {
+  usageCount++;
+  res.json({ count: usageCount });
+});
 
 io.on('connection', (socket) => {
   console.log('Socket connected:', socket.id);
@@ -40,6 +52,8 @@ io.on('connection', (socket) => {
       return;
     }
 
+    socket.emit('transcription-status', { status: 'processing' });
+
     try {
       const audioBuffer = Buffer.concat(audioChunks.map(c => Buffer.from(c)));
       const blob = new Blob([audioBuffer], { type: 'audio/webm' });
@@ -48,7 +62,8 @@ io.on('connection', (socket) => {
       const transcript = await openai.audio.transcriptions.create({
         model: 'whisper-1',
         file,
-        language: 'en',
+        response_format: 'verbose_json',
+        prompt: 'Sinhala, English, Singlish, Tamil speech including code-mixed conversations.',
       });
 
       socket.emit('transcription', { text: transcript.text });
@@ -68,7 +83,4 @@ io.on('connection', (socket) => {
 
 server.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
-  console.log('BASE_URL:', process.env.ZEN_BASE_URL);
-  console.log('MODEL:', process.env.BIG_PICKLE_MODEL);
-  console.log('KEY:', process.env.OPENAI_API_KEY ? 'SET' : 'NOT SET');
 });

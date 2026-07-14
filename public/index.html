@@ -1,701 +1,287 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>LetterBot - AI Letter Generator</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.14/dist/full.min.css" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: ['selector', '[data-theme="dark"]'],
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+        }
+      }
+    }
+  </script>
   <style>
-    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-
-    :root {
-      --bg-primary: #0a0a0f;
-      --bg-secondary: #12121a;
-      --bg-card: rgba(255,255,255,0.03);
-      --bg-card-hover: rgba(255,255,255,0.06);
-      --border: rgba(255,255,255,0.06);
-      --border-focus: rgba(99,102,241,0.5);
-      --text-primary: #f0f0f5;
-      --text-secondary: #8888a0;
-      --text-muted: #55556a;
-      --accent: #6366f1;
-      --accent-hover: #818cf8;
-      --accent-glow: rgba(99,102,241,0.15);
-      --danger: #ef4444;
-      --danger-hover: #f87171;
-      --success: #22c55e;
-      --purple: #a855f7;
-      --purple-hover: #c084fc;
-      --radius: 16px;
-      --radius-sm: 10px;
-      --radius-full: 9999px;
-      --shadow: 0 8px 32px rgba(0,0,0,0.3);
-      --shadow-lg: 0 16px 64px rgba(0,0,0,0.4);
-      --transition: 0.2s cubic-bezier(0.4,0,0.2,1);
-    }
-
-    body {
-      font-family: 'Inter', -apple-system, sans-serif;
-      background: var(--bg-primary);
-      color: var(--text-primary);
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
-
-    body::before {
-      content: '';
-      position: fixed;
-      top: -50%;
-      left: -50%;
-      width: 200%;
-      height: 200%;
-      background: radial-gradient(ellipse at 30% 20%, rgba(99,102,241,0.08) 0%, transparent 50%),
-                  radial-gradient(ellipse at 70% 80%, rgba(168,85,247,0.06) 0%, transparent 50%);
-      animation: bgShift 20s ease-in-out infinite alternate;
-      z-index: -1;
-      pointer-events: none;
-    }
-
-    @keyframes bgShift {
-      0% { transform: translate(0,0) rotate(0deg); }
-      100% { transform: translate(-5%,3%) rotate(3deg); }
-    }
-
-    @keyframes fadeInUp {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
-
-    @keyframes slideDown {
-      from { opacity: 0; transform: translateY(-10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
+    [data-theme="dark"] { color-scheme: dark; }
 
     @keyframes pulse-ring {
       0% { transform: scale(1); opacity: 1; }
-      100% { transform: scale(1.5); opacity: 0; }
+      100% { transform: scale(1.8); opacity: 0; }
     }
-
     @keyframes float {
       0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-6px); }
+      50% { transform: translateY(-4px); }
     }
-
-    .container { max-width: 720px; margin: 0 auto; padding: 0 20px; }
-
-    /* ─── Header ─── */
-    header {
-      position: sticky;
-      top: 0;
-      z-index: 50;
-      backdrop-filter: blur(20px) saturate(1.5);
-      -webkit-backdrop-filter: blur(20px) saturate(1.5);
-      background: rgba(10,10,15,0.7);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .header-inner {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      padding: 16px 0;
-    }
-
-    .logo-icon {
-      width: 42px;
-      height: 42px;
-      border-radius: 12px;
-      background: linear-gradient(135deg, var(--accent), var(--purple));
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 4px 20px rgba(99,102,241,0.3);
-      animation: float 4s ease-in-out infinite;
-    }
-
-    .logo-icon svg { width: 22px; height: 22px; color: white; }
-
-    .header-text { flex: 1; }
-    .header-text h1 { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.02em; }
-    .header-text p { font-size: 0.75rem; color: var(--text-muted); font-weight: 400; }
-
-    .lang-badge {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 14px;
-      border-radius: var(--radius-full);
-      font-size: 0.75rem;
-      font-weight: 600;
-      letter-spacing: 0.05em;
-      border: 1px solid var(--border);
-      background: var(--bg-card);
-      transition: var(--transition);
-    }
-
-    .lang-badge .dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--accent);
-    }
-
-    /* ─── Main ─── */
-    main { padding: 40px 0 80px; }
-
-    .subtitle {
-      text-align: center;
-      color: var(--text-secondary);
-      font-size: 0.9rem;
-      margin-bottom: 32px;
-      animation: fadeInUp 0.6s ease;
-    }
-
-    /* ─── Card ─── */
-    .card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 28px;
-      margin-bottom: 24px;
-      backdrop-filter: blur(10px);
-      transition: var(--transition);
-      animation: fadeInUp 0.5s ease backwards;
-    }
-
-    .card:nth-child(2) { animation-delay: 0.1s; }
-    .card:nth-child(3) { animation-delay: 0.2s; }
-
-    .card:hover { background: var(--bg-card-hover); }
-
-    /* ─── Controls Row ─── */
-    .controls-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-bottom: 16px;
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 18px;
-      border-radius: var(--radius-sm);
-      font-size: 0.82rem;
-      font-weight: 500;
-      font-family: inherit;
-      border: 1px solid var(--border);
-      background: var(--bg-card);
-      color: var(--text-primary);
-      cursor: pointer;
-      transition: var(--transition);
-      outline: none;
-      white-space: nowrap;
-    }
-
-    .btn:hover { background: var(--bg-card-hover); border-color: rgba(255,255,255,0.1); }
-    .btn:active { transform: scale(0.97); }
-    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
-
-    .btn svg { width: 16px; height: 16px; flex-shrink: 0; }
-
-    .btn-record {
-      background: rgba(239,68,68,0.1);
-      border-color: rgba(239,68,68,0.2);
-      color: var(--danger);
-    }
-    .btn-record:hover { background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.3); }
-    .btn-record.recording {
-      animation: pulse-record 1.5s ease-in-out infinite;
-    }
-
-    @keyframes pulse-record {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.3); }
-      50% { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
-    }
-
-    .recording-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--danger);
-      animation: pulse-ring 1s ease-in-out infinite;
-      position: relative;
-    }
-
-    .recording-indicator {
-      display: none;
-      align-items: center;
-      gap: 8px;
-      font-size: 0.8rem;
-      color: var(--danger);
-      font-weight: 500;
-    }
-
-    .recording-indicator.active { display: flex; }
-
-    /* ─── Select ─── */
-    .select-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-bottom: 16px;
-    }
-
-    .custom-select {
-      position: relative;
-      flex: 1;
-      min-width: 150px;
-    }
-
-    .custom-select select {
-      width: 100%;
-      padding: 12px 16px;
-      padding-right: 40px;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--border);
-      background: var(--bg-card);
-      color: var(--text-primary);
-      font-size: 0.85rem;
-      font-family: inherit;
-      font-weight: 500;
-      outline: none;
-      cursor: pointer;
-      transition: var(--transition);
-      appearance: none;
-      -webkit-appearance: none;
-    }
-
-    .custom-select select:hover { border-color: rgba(255,255,255,0.1); }
-    .custom-select select:focus { border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--accent-glow); }
-
-    .custom-select::after {
-      content: '';
-      position: absolute;
-      right: 14px;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 0;
-      height: 0;
-      border-left: 5px solid transparent;
-      border-right: 5px solid transparent;
-      border-top: 5px solid var(--text-muted);
-      pointer-events: none;
-    }
-
-    .custom-select option {
-      background: var(--bg-secondary);
-      color: var(--text-primary);
-    }
-
-    /* ─── Textarea ─── */
-    .textarea-wrap {
-      position: relative;
-    }
-
-    textarea {
-      width: 100%;
-      min-height: 130px;
-      padding: 16px;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--border);
-      background: var(--bg-card);
-      color: var(--text-primary);
-      font-size: 0.9rem;
-      font-family: inherit;
-      line-height: 1.6;
-      resize: vertical;
-      outline: none;
-      transition: var(--transition);
-    }
-
-    textarea::placeholder { color: var(--text-muted); }
-    textarea:hover { border-color: rgba(255,255,255,0.1); }
-    textarea:focus { border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--accent-glow); }
-
-    /* ─── Generate Button ─── */
-    .generate-btn {
-      width: 100%;
-      padding: 14px 24px;
-      margin-top: 16px;
-      border-radius: var(--radius-sm);
-      border: none;
-      background: linear-gradient(135deg, var(--accent), var(--purple));
-      color: white;
-      font-size: 0.9rem;
-      font-weight: 600;
-      font-family: inherit;
-      cursor: pointer;
-      transition: var(--transition);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .generate-btn::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent);
-      opacity: 0;
-      transition: var(--transition);
-    }
-
-    .generate-btn:hover::before { opacity: 1; }
-    .generate-btn:hover { box-shadow: 0 8px 30px rgba(99,102,241,0.3); transform: translateY(-1px); }
-    .generate-btn:active { transform: translateY(0) scale(0.99); }
-    .generate-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
-
-    /* ─── Output Section ─── */
-    .output-section {
-      display: none;
-      animation: fadeInUp 0.4s ease;
-    }
-
-    .output-section.visible { display: block; }
-
-    .output-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 20px;
-      flex-wrap: wrap;
-      gap: 12px;
-    }
-
-    .output-title {
-      font-size: 1.1rem;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .output-title::before {
-      content: '';
-      width: 4px;
-      height: 20px;
-      border-radius: 2px;
-      background: linear-gradient(180deg, var(--accent), var(--purple));
-    }
-
-    .action-btns { display: flex; gap: 8px; }
-
-    .btn-action {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 8px 14px;
-      border-radius: var(--radius-sm);
-      font-size: 0.78rem;
-      font-weight: 500;
-      font-family: inherit;
-      border: 1px solid var(--border);
-      background: var(--bg-card);
-      color: var(--text-secondary);
-      cursor: pointer;
-      transition: var(--transition);
-    }
-
-    .btn-action:hover { color: var(--text-primary); background: var(--bg-card-hover); border-color: rgba(255,255,255,0.1); }
-    .btn-action:active { transform: scale(0.96); }
-    .btn-action svg { width: 14px; height: 14px; }
-
-    /* ─── Letter Content ─── */
-    .letter-output {
-      background: rgba(255,255,255,0.02);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 24px;
-      min-height: 120px;
-      line-height: 1.8;
-      font-size: 0.88rem;
-      color: var(--text-secondary);
-      white-space: pre-wrap;
-      word-break: break-word;
-      transition: var(--transition);
-    }
-
-    .letter-output:empty::before {
-      content: '';
-    }
-
-    .cursor-blink {
-      display: inline-block;
-      width: 2px;
-      height: 1em;
-      background: var(--accent);
-      margin-left: 2px;
-      vertical-align: text-bottom;
-      animation: blink 1s step-end infinite;
-    }
-
     @keyframes blink {
       0%, 100% { opacity: 1; }
       50% { opacity: 0; }
     }
-
-    /* ─── Loading ─── */
-    .loading {
-      display: none;
-      align-items: center;
-      gap: 12px;
-      padding: 16px 0;
-      color: var(--text-muted);
-      font-size: 0.82rem;
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
     }
 
-    .loading.active { display: flex; }
-
-    .loading-dots {
-      display: flex;
-      gap: 4px;
-    }
-
-    .loading-dots span {
-      width: 6px;
-      height: 6px;
+    .recording-ring {
+      position: absolute;
+      inset: -4px;
       border-radius: 50%;
-      background: var(--accent);
-      animation: bounce-dot 1.2s ease-in-out infinite;
-    }
-
-    .loading-dots span:nth-child(2) { animation-delay: 0.15s; }
-    .loading-dots span:nth-child(3) { animation-delay: 0.3s; }
-
-    @keyframes bounce-dot {
-      0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
-      30% { transform: translateY(-6px); opacity: 1; }
-    }
-
-    /* ─── Email Row ─── */
-    .email-row {
-      display: flex;
-      gap: 10px;
-      margin-top: 20px;
-      padding-top: 20px;
-      border-top: 1px solid var(--border);
-      flex-wrap: wrap;
-    }
-
-    .email-input {
-      flex: 1;
-      min-width: 200px;
-      padding: 10px 16px;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--border);
-      background: var(--bg-card);
-      color: var(--text-primary);
-      font-size: 0.82rem;
-      font-family: inherit;
-      outline: none;
-      transition: var(--transition);
-    }
-
-    .email-input::placeholder { color: var(--text-muted); }
-    .email-input:focus { border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--accent-glow); }
-
-    .btn-email {
-      padding: 10px 20px;
-      border-radius: var(--radius-sm);
-      border: none;
-      background: linear-gradient(135deg, var(--purple), #ec4899);
-      color: white;
-      font-size: 0.82rem;
-      font-weight: 600;
-      font-family: inherit;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      transition: var(--transition);
-    }
-
-    .btn-email:hover { box-shadow: 0 6px 24px rgba(168,85,247,0.3); transform: translateY(-1px); }
-    .btn-email:active { transform: translateY(0); }
-    .btn-email:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-    .btn-email svg { width: 14px; height: 14px; }
-
-    /* ─── Footer ─── */
-    footer {
-      border-top: 1px solid var(--border);
-      padding: 24px 0;
-      text-align: center;
-      font-size: 0.75rem;
-      color: var(--text-muted);
-    }
-
-    footer span { color: var(--accent); }
-
-    /* ─── Toast ─── */
-    .toast {
-      position: fixed;
-      bottom: 24px;
-      left: 50%;
-      transform: translateX(-50%) translateY(20px);
-      padding: 12px 24px;
-      border-radius: var(--radius-sm);
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      color: var(--text-primary);
-      font-size: 0.82rem;
-      font-weight: 500;
-      box-shadow: var(--shadow-lg);
-      opacity: 0;
-      transition: all 0.3s ease;
-      z-index: 100;
+      border: 2px solid oklch(var(--er));
+      animation: pulse-ring 1.2s ease-in-out infinite;
       pointer-events: none;
     }
-
-    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-    /* ─── Responsive ─── */
-    @media (max-width: 600px) {
-      .container { padding: 0 14px; }
-      .card { padding: 20px; }
-      .controls-row { gap: 8px; }
-      .btn { padding: 8px 14px; font-size: 0.78rem; }
-      .output-header { flex-direction: column; align-items: flex-start; }
-      .email-row { flex-direction: column; }
+    .float-anim { animation: float 3s ease-in-out infinite; }
+    .cursor-blink {
+      display: inline-block;
+      width: 2px;
+      height: 1.1em;
+      background: oklch(var(--p));
+      margin-left: 2px;
+      vertical-align: text-bottom;
+      animation: blink 1s step-end infinite;
+    }
+    .shimmer-bar {
+      background: linear-gradient(90deg, oklch(var(--bc) / 0.05) 25%, oklch(var(--bc) / 0.1) 50%, oklch(var(--bc) / 0.05) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
     }
 
-    /* ─── Scrollbar ─── */
+    .history-item:hover .history-delete { opacity: 1; }
+    .history-delete { opacity: 0; transition: opacity 0.15s; }
+
     ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+    ::-webkit-scrollbar-thumb { background: oklch(var(--bc) / 0.15); border-radius: 3px; }
   </style>
 </head>
-<body>
-  <header>
-    <div class="container">
-      <div class="header-inner">
-        <div class="logo-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<body class="min-h-screen bg-base-100 text-base-content font-sans transition-colors duration-300">
+
+  <!-- HEADER -->
+  <header class="sticky top-0 z-50 backdrop-blur-xl bg-base-100/70 border-b border-base-300">
+    <div class="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg float-anim">
+          <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <rect x="2" y="4" width="20" height="16" rx="2"/>
             <path d="M22 7L12 13L2 7"/>
           </svg>
         </div>
-        <div class="header-text">
-          <h1>LetterBot</h1>
-          <p>AI Letter Generator</p>
+        <div>
+          <h1 class="text-base font-bold leading-tight">LetterBot</h1>
+          <p class="text-xs text-base-content/50">AI Letter Generator</p>
         </div>
-        <div id="langBadge" class="lang-badge">
-          <span class="dot"></span>
-          <span>EN</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <!-- Usage Tracker -->
+        <div id="usageBadge" class="badge badge-outline gap-1 text-xs" title="Community usage counter">
+          <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+          <span id="usageCount">0</span>
         </div>
+        <!-- Language Badge -->
+        <div id="langBadge" class="badge badge-primary gap-1 text-xs">
+          <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
+          <span id="langCode">EN</span>
+        </div>
+        <!-- Theme Toggle -->
+        <button id="themeToggle" class="btn btn-ghost btn-sm btn-circle swap swap-rotate" title="Toggle theme">
+          <svg id="sunIcon" class="swap-off w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          <svg id="moonIcon" class="swap-on w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+        </button>
       </div>
     </div>
   </header>
 
-  <main>
-    <div class="container">
-      <p class="subtitle">Speak or type your thoughts, and AI will write a letter for you</p>
+  <!-- MAIN -->
+  <main class="max-w-3xl mx-auto px-4 py-6 pb-24">
 
-      <div class="card">
-        <div class="controls-row">
-          <button id="startRecordBtn" class="btn btn-record">
-            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a3 3 0 00-3 3v5a3 3 0 006 0V5a3 3 0 00-3-3z"/><path d="M5 10a1 1 0 00-2 0 7 7 0 0014 0 1 1 0 00-2 0 5 5 0 01-10 0z"/></svg>
+    <p class="text-center text-base-content/60 text-sm mb-6">Speak or type your thoughts, and AI will write a letter for you</p>
+
+    <!-- STEP-BY-STEP PROGRESS -->
+    <div id="progressSteps" class="hidden mb-6">
+      <ul class="steps steps-horizontal w-full text-xs">
+        <li id="stepRecord" class="step step-primary">Record</li>
+        <li id="stepProcess" class="step">Processing</li>
+        <li id="stepGenerate" class="step">Generating</li>
+      </ul>
+    </div>
+
+    <!-- TONE DETECTION BANNER -->
+    <div id="toneBanner" class="hidden alert alert-info mb-4 text-sm py-2">
+      <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+      <span id="toneText">Tone detected: <strong>Formal</strong></span>
+    </div>
+
+    <!-- INPUT CARD -->
+    <div class="card bg-base-200/50 border border-base-300 shadow-sm mb-6">
+      <div class="card-body gap-4 p-5">
+
+        <!-- Record / Stop / Clear -->
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="startRecordBtn" class="btn btn-error btn-outline btn-sm gap-1.5">
+            <span class="relative flex items-center justify-center">
+              <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a3 3 0 00-3 3v5a3 3 0 006 0V5a3 3 0 00-3-3z"/><path d="M5 10a1 1 0 00-2 0 7 7 0 0014 0 1 1 0 00-2 0 5 5 0 01-10 0z"/></svg>
+            </span>
             Record
           </button>
-          <button id="stopRecordBtn" class="btn" disabled>
-            <svg viewBox="0 0 20 20" fill="currentColor"><rect width="8" height="8" x="6" y="6" rx="1"/></svg>
+          <button id="stopRecordBtn" class="btn btn-ghost btn-sm gap-1.5" disabled>
+            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><rect width="8" height="8" x="6" y="6" rx="1"/></svg>
             Stop
           </button>
-          <button id="clearBtn" class="btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          <button id="clearBtn" class="btn btn-ghost btn-sm gap-1.5">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
             Clear
           </button>
-          <div id="recordingIndicator" class="recording-indicator">
-            <span class="recording-dot"></span>
+          <div id="recordingIndicator" class="hidden items-center gap-2 text-error text-xs font-medium ml-2">
+            <span class="relative flex h-2.5 w-2.5">
+              <span class="recording-ring"></span>
+              <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-error"></span>
+            </span>
             Recording...
           </div>
         </div>
 
-        <div class="select-row">
-          <div class="custom-select">
-            <select id="templateSelect">
-              <option value="general">General Letter</option>
-              <option value="leave">Leave Letter</option>
-              <option value="complaint">Complaint Letter</option>
-              <option value="resignation">Resignation Letter</option>
-              <option value="application">Job Application</option>
-              <option value="recommendation">Recommendation Letter</option>
-              <option value="apology">Apology Letter</option>
-              <option value="thank_you">Thank You Letter</option>
-            </select>
-          </div>
-          <div class="custom-select">
-            <select id="typeSelect">
-              <option value="formal">Formal</option>
-              <option value="informal">Informal</option>
-            </select>
-          </div>
+        <!-- Template + Tone Selects -->
+        <div class="flex flex-wrap gap-2">
+          <select id="templateSelect" class="select select-bordered select-sm flex-1 min-w-[140px] text-sm">
+            <option value="general">General Letter</option>
+            <option value="leave">Leave Letter</option>
+            <option value="complaint">Complaint Letter</option>
+            <option value="resignation">Resignation Letter</option>
+            <option value="application">Job Application</option>
+            <option value="recommendation">Recommendation Letter</option>
+            <option value="apology">Apology Letter</option>
+            <option value="thank_you">Thank You Letter</option>
+          </select>
+          <select id="typeSelect" class="select select-bordered select-sm flex-1 min-w-[140px] text-sm">
+            <option value="auto">Auto-Detect Tone</option>
+            <option value="formal">Formal</option>
+            <option value="informal">Informal</option>
+          </select>
         </div>
 
-        <div class="textarea-wrap">
-          <textarea id="inputText" rows="4" placeholder="Type your thoughts here, or use the microphone to speak..."></textarea>
-        </div>
+        <!-- Textarea -->
+        <textarea id="inputText" rows="4" class="textarea textarea-bordered w-full text-sm leading-relaxed resize-y" placeholder="Type your thoughts here, or use the microphone to speak..."></textarea>
 
-        <button id="generateBtn" class="generate-btn">
+        <!-- Generate -->
+        <button id="generateBtn" class="btn btn-primary w-full gap-2">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
           Generate Letter
         </button>
       </div>
+    </div>
 
-      <div id="outputSection" class="output-section">
-        <div class="card">
-          <div class="output-header">
-            <h2 class="output-title" id="outputTitle">Generated Letter</h2>
-            <div class="action-btns">
-              <button id="copyBtn" class="btn-action">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+    <!-- OUTPUT SECTION -->
+    <div id="outputSection" class="hidden">
+      <div class="card bg-base-200/50 border border-base-300 shadow-sm">
+        <div class="card-body gap-4 p-5">
+
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <h2 class="card-title text-base">
+              <span class="w-1 h-5 rounded bg-gradient-to-b from-primary to-secondary inline-block"></span>
+              <span id="outputTitle">Generated Letter</span>
+            </h2>
+            <div class="flex flex-wrap gap-1.5">
+              <button id="copyBtn" class="btn btn-ghost btn-xs gap-1">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                 Copy
               </button>
-              <button id="pdfBtn" class="btn-action">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              <button id="pdfBtn" class="btn btn-ghost btn-xs gap-1">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                 PDF
+              </button>
+              <button id="historySaveBtn" class="btn btn-ghost btn-xs gap-1" title="Save to history">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Save
               </button>
             </div>
           </div>
 
-          <div id="letterContent" class="letter-output"></div>
-          <span id="cursor" class="cursor-blink" style="display:none"></span>
+          <!-- Letter Output -->
+          <div id="letterContent" class="min-h-[100px] text-sm leading-relaxed whitespace-pre-wrap break-words text-base-content/80"></div>
+          <span id="cursor" class="cursor-blink hidden"></span>
 
-          <div id="loadingIndicator" class="loading">
-            <div class="loading-dots">
-              <span></span><span></span><span></span>
-            </div>
+          <!-- Loading -->
+          <div id="loadingIndicator" class="hidden items-center gap-3 text-base-content/50 text-xs">
+            <span class="loading loading-dots loading-sm text-primary"></span>
             <span>Generating your letter...</span>
           </div>
 
-          <div class="email-row">
-            <input id="emailInput" type="email" class="email-input" placeholder="Enter email to send..." />
-            <button id="emailBtn" class="btn-email">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-              Send Email
+          <!-- POLISH TOOLS -->
+          <div id="polishTools" class="hidden border-t border-base-300 pt-4">
+            <p class="text-xs text-base-content/50 mb-2 font-medium">Polish your letter:</p>
+            <div class="flex flex-wrap gap-1.5">
+              <button class="polish-btn btn btn-outline btn-xs gap-1" data-action="expand">
+                <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14m-7-7h14"/></svg>
+                Expand
+              </button>
+              <button class="polish-btn btn btn-outline btn-xs gap-1" data-action="summarize">
+                <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></svg>
+                Summarize
+              </button>
+              <button class="polish-btn btn btn-outline btn-xs gap-1" data-action="rephrase">
+                <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                Rephrase
+              </button>
+            </div>
+            <div id="polishLoading" class="hidden items-center gap-2 text-xs text-base-content/50 mt-2">
+              <span class="loading loading-dots loading-xs text-secondary"></span>
+              <span>Polishing...</span>
+            </div>
+          </div>
+
+          <!-- Email Row -->
+          <div class="border-t border-base-300 pt-4 flex flex-wrap gap-2">
+            <input id="emailInput" type="email" class="input input-bordered input-sm flex-1 min-w-[200px] text-sm" placeholder="Enter email to send..." />
+            <button id="emailBtn" class="btn btn-secondary btn-sm gap-1.5">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+              Send
             </button>
           </div>
+
         </div>
       </div>
     </div>
+
+    <!-- HISTORY SECTION -->
+    <div id="historySection" class="mt-8">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-semibold text-base-content/70 flex items-center gap-2">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          History
+        </h2>
+        <button id="clearHistoryBtn" class="btn btn-ghost btn-xs text-error">Clear All</button>
+      </div>
+      <div id="historyList" class="space-y-2"></div>
+      <p id="historyEmpty" class="text-xs text-base-content/40 text-center py-4 hidden">No letters saved yet</p>
+    </div>
   </main>
 
-  <footer>
-    <div class="container">
-      <p>LetterBot <span>&mdash;</span> Made with AI <span>&hearts;</span> <span>&mdash;</span> Supports English, &#3517;&#3530;&#3495;, &#3583;&#3520;&#3538;</p>
-    </div>
+  <!-- FOOTER -->
+  <footer class="border-t border-base-300 py-4 text-center text-xs text-base-content/40">
+    LetterBot &mdash; Made with AI &hearts; &mdash; Supports English, Sinhala, Tamil & Singlish
   </footer>
 
-  <div id="toast" class="toast"></div>
+  <!-- TOAST -->
+  <div id="toast" class="toast toast-bottom toast-center z-50">
+    <div id="toastAlert" class="alert alert-sm text-sm hidden shadow-lg"></div>
+  </div>
 
   <script src="app.js"></script>
 </body>

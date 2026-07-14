@@ -29,13 +29,52 @@ router.post('/generate-letter', async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
 
-  const letterType = type === 'formal' ? 'formal' : 'informal';
   const templateKey = template || 'general';
   const templateInstruction = templatePrompts[templateKey] || templatePrompts.general;
 
+  let letterType;
+  let detectedTone = null;
+
+  if (type === 'auto') {
+    try {
+      const toneResponse = await openai.chat.completions.create({
+        model: process.env.BIG_PICKLE_MODEL || 'big-pickle',
+        messages: [
+          {
+            role: 'system',
+            content: `Analyze the following text and determine if it should be written as a FORMAL or INFORMAL letter. Consider factors like:
+- Vocabulary (casual vs professional)
+- Context (work/school vs personal)
+- Relationship implied (boss/colleague vs friend/family)
+- Sentiment and urgency
+
+Reply with ONLY one word: "formal" or "informal". Nothing else.`,
+          },
+          { role: 'user', content: text },
+        ],
+        max_tokens: 10,
+        temperature: 0,
+      });
+
+      const toneResult = (toneResponse.choices[0]?.delta?.content || toneResponse.choices[0]?.message?.content || 'formal').trim().toLowerCase();
+      detectedTone = toneResult === 'informal' ? 'informal' : 'formal';
+      letterType = detectedTone;
+    } catch {
+      letterType = 'formal';
+      detectedTone = 'formal';
+    }
+  } else {
+    letterType = type === 'informal' ? 'informal' : 'formal';
+    detectedTone = letterType;
+  }
+
+  res.write(`data: ${JSON.stringify({ tone_detected: detectedTone })}\n\n`);
+
   const systemPrompt = `You are a letter writing assistant. Generate a ${letterType} ${templateInstruction} based on the user's input.
 
-IMPORTANT: Auto-detect the language of the user's input and respond in the SAME language (e.g., if user writes in Sinhala, respond in Sinhala; if in Tamil, respond in Tamil; if in English, respond in English).
+IMPORTANT: Auto-detect the language of the user's input and respond in the SAME language (e.g., if user writes in Sinhala, respond in Sinhala; if in Tamil, respond in Tamil; if in English, respond in English). Support Singlish (code-mixed Sinhala-English) as well.
+
+IMPORTANT: Write in a clearly ${letterType} tone. ${letterType === 'formal' ? 'Use professional language, proper grammar, and formal structure.' : 'Use casual, friendly language and a relaxed tone.'}
 
 Return the letter chunk by chunk as you write it. Do NOT include any extra text, only the letter content.`;
 
@@ -64,7 +103,6 @@ Return the letter chunk by chunk as you write it. Do NOT include any extra text,
     res.end();
   } catch (error) {
     console.error('OpenAI API error:', error.message);
-    console.error('Full error:', JSON.stringify(error, null, 2));
     res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
     res.end();
   }
