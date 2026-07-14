@@ -18,31 +18,36 @@ const emailInput = document.getElementById('emailInput');
 const loadingIndicator = document.getElementById('loadingIndicator');
 const recordingIndicator = document.getElementById('recordingIndicator');
 const langBadge = document.getElementById('langBadge');
+const toastEl = document.getElementById('toast');
 
 let mediaRecorder = null;
 let audioChunks = [];
 let isRecording = false;
 let isGenerating = false;
 
+function showToast(msg, duration = 2500) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  setTimeout(() => toastEl.classList.remove('show'), duration);
+}
+
 const langMap = {
-  si: { code: 'SI', label: 'සිංහල', color: 'bg-green-100 text-green-700' },
-  ta: { code: 'TA', label: 'தமிழ்', color: 'bg-orange-100 text-orange-700' },
-  en: { code: 'EN', label: 'English', color: 'bg-blue-100 text-blue-700' },
+  si: { code: 'SI', color: '#22c55e' },
+  ta: { code: 'TA', color: '#f97316' },
+  en: { code: 'EN', color: '#6366f1' },
 };
 
 function detectLanguage(text) {
   if (!text.trim()) return langMap.en;
-  const sinhalaPattern = /[\u0D80-\u0DFF]/;
-  const tamilPattern = /[\u0B80-\u0BFF]/;
-  if (sinhalaPattern.test(text)) return langMap.si;
-  if (tamilPattern.test(text)) return langMap.ta;
+  if (/[\u0D80-\u0DFF]/.test(text)) return langMap.si;
+  if (/[\u0B80-\u0BFF]/.test(text)) return langMap.ta;
   return langMap.en;
 }
 
 function updateLangBadge(text) {
   const lang = detectLanguage(text);
-  langBadge.className = `flex items-center gap-2 px-3 py-1.5 ${lang.color} text-sm rounded-full`;
-  langBadge.innerHTML = `<span class="w-2 h-2 rounded-full" style="background:currentColor"></span><span>${lang.code}</span>`;
+  langBadge.querySelector('.dot').style.background = lang.color;
+  langBadge.querySelector('span:last-child').textContent = lang.code;
 }
 
 inputText.addEventListener('input', () => updateLangBadge(inputText.value));
@@ -75,9 +80,10 @@ async function startRecording() {
     isRecording = true;
     startBtn.disabled = true;
     stopBtn.disabled = false;
-    recordingIndicator.classList.remove('hidden');
+    startBtn.classList.add('recording');
+    recordingIndicator.classList.add('active');
   } catch (err) {
-    alert('Microphone access denied. Please allow microphone permissions.');
+    showToast('Microphone access denied');
     console.error(err);
   }
 }
@@ -88,8 +94,8 @@ function stopRecording() {
     isRecording = false;
     startBtn.disabled = false;
     stopBtn.disabled = true;
-    recordingIndicator.classList.add('hidden');
-    recordingIndicator.classList.add('hidden');
+    startBtn.classList.remove('recording');
+    recordingIndicator.classList.remove('active');
   }
 }
 
@@ -97,14 +103,16 @@ socket.on('transcription', (data) => {
   if (data.text) {
     inputText.value = (inputText.value + ' ' + data.text).trim();
     updateLangBadge(inputText.value);
+    showToast('Transcription received');
   }
 });
 
 function clearAll() {
   inputText.value = '';
-  outputSection.classList.add('hidden');
+  outputSection.classList.remove('visible');
   letterContent.textContent = '';
   audioChunks = [];
+  cursor.style.display = 'none';
   updateLangBadge('');
 }
 
@@ -113,7 +121,7 @@ generateBtn.addEventListener('click', generateLetter);
 async function generateLetter() {
   const text = inputText.value.trim();
   if (!text) {
-    alert('Please enter or speak some text first!');
+    showToast('Please enter or speak some text first');
     return;
   }
   if (isGenerating) return;
@@ -121,10 +129,10 @@ async function generateLetter() {
   isGenerating = true;
   generateBtn.disabled = true;
 
-  outputSection.classList.remove('hidden');
+  outputSection.classList.add('visible');
   letterContent.textContent = '';
-  cursor.classList.remove('hidden');
-  loadingIndicator.classList.remove('hidden');
+  cursor.style.display = 'inline-block';
+  loadingIndicator.classList.add('active');
 
   const templateLabel = templateSelect.options[templateSelect.selectedIndex].text;
   outputTitle.textContent = templateLabel;
@@ -162,8 +170,9 @@ async function generateLetter() {
           const data = JSON.parse(line.slice(6));
           if (data.error) throw new Error(data.error);
           if (data.done) {
-            cursor.classList.add('hidden');
-            loadingIndicator.classList.add('hidden');
+            cursor.style.display = 'none';
+            loadingIndicator.classList.remove('active');
+            showToast('Letter generated successfully');
           }
           if (data.chunk) {
             letterContent.textContent = data.full || letterContent.textContent + data.chunk;
@@ -173,9 +182,9 @@ async function generateLetter() {
       }
     }
   } catch (error) {
-    alert('Error: ' + error.message);
-    cursor.classList.add('hidden');
-    loadingIndicator.classList.add('hidden');
+    showToast('Error: ' + error.message, 4000);
+    cursor.style.display = 'none';
+    loadingIndicator.classList.remove('active');
   } finally {
     isGenerating = false;
     generateBtn.disabled = false;
@@ -186,9 +195,10 @@ copyBtn.addEventListener('click', () => {
   const text = letterContent.textContent;
   if (!text) return;
   navigator.clipboard.writeText(text).then(() => {
-    copyBtn.innerHTML = `Copied!`;
+    copyBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Copied!`;
+    showToast('Copied to clipboard');
     setTimeout(() => {
-      copyBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg> Copy`;
+      copyBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg> Copy`;
     }, 2000);
   });
 });
@@ -196,7 +206,7 @@ copyBtn.addEventListener('click', () => {
 pdfBtn.addEventListener('click', () => {
   const text = letterContent.textContent;
   if (!text) {
-    alert('No letter content to export!');
+    showToast('No letter content to export');
     return;
   }
   const { jsPDF } = window.jspdf;
@@ -205,34 +215,31 @@ pdfBtn.addEventListener('click', () => {
   doc.setFont('Helvetica', 'normal');
   doc.text(lines, 15, 20);
   doc.save('letter.pdf');
+  showToast('PDF downloaded');
 });
 
 emailBtn.addEventListener('click', async () => {
   const body = letterContent.textContent;
   const to = emailInput.value.trim();
-  if (!body) { alert('No letter to send!'); return; }
-  if (!to) { alert('Please enter an email address!'); return; }
+  if (!body) { showToast('No letter to send'); return; }
+  if (!to) { showToast('Please enter an email address'); return; }
 
   emailBtn.disabled = true;
-  emailBtn.textContent = 'Sending...';
+  emailBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Sending...`;
 
   try {
     const res = await fetch('/api/send-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        to,
-        subject: outputTitle.textContent,
-        body,
-      }),
+      body: JSON.stringify({ to, subject: outputTitle.textContent, body }),
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
-    alert('Email sent successfully!');
+    showToast('Email sent successfully');
   } catch (err) {
-    alert('Failed to send email: ' + err.message);
+    showToast('Failed to send: ' + err.message, 4000);
   } finally {
     emailBtn.disabled = false;
-    emailBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg> Send Email`;
+    emailBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg> Send Email`;
   }
 });
