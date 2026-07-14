@@ -3,7 +3,7 @@ const router = express.Router();
 const nodemailer = require('nodemailer');
 
 router.post('/send-email', async (req, res) => {
-  const { to, subject, body } = req.body;
+  const { to, subject, body, fromEmail } = req.body;
   if (!to || !subject || !body) {
     return res.status(400).json({ error: 'to, subject, and body are required' });
   }
@@ -21,6 +21,7 @@ router.post('/send-email', async (req, res) => {
   try {
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
+      replyTo: fromEmail || process.env.EMAIL_USER,
       to,
       subject,
       text: body,

@@ -487,7 +487,7 @@ emailBtn.addEventListener('click', async () => {
     const res = await fetch('/api/send-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to, subject: outputTitle.textContent, body }),
+      body: JSON.stringify({ to, subject: outputTitle.textContent, body, fromEmail: currentUser?.email }),
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
